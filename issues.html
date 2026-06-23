@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이슈 - 시설관리</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main class="container">
+    <h1>이슈/고장 목록</h1>
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead><tr><th>설비</th><th>제목</th><th>심각도</th><th>상태</th><th>발생일</th><th>완료일</th></tr></thead>
+        <tbody id="issuesBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+</main>
+
+<script src="js/lib.js"></script>
+<script src="js/nav.js"></script>
+<script>
+(async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    renderNavbar();
+
+    const { data: issues, error } = await sb
+        .from("issues").select("*, equipment(id, name)").order("reported_at", { ascending: false });
+    if (error) { alert(error.message); return; }
+
+    const tbody = document.getElementById("issuesBody");
+    if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="6">이슈가 없습니다.</td></tr>`; return; }
+    tbody.innerHTML = issues.map(i => `
+        <tr>
+            <td><a href="equipment-detail.html?id=${i.equipment.id}">${escapeHtml(i.equipment.name)}</a></td>
+            <td>${escapeHtml(i.title)}</td>
+            <td>${escapeHtml(i.severity)}</td>
+            <td>${escapeHtml(i.status)}</td>
+            <td>${i.occurred_at || "-"}</td>
+            <td>${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
+        </tr>
+    `).join("");
+})();
+</script>
+</body>
+</html>

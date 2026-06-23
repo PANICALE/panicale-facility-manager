@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설비 상세 - 시설관리</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main class="container">
+    <h1 id="eqName">불러오는 중...</h1>
+    <p class="meta-line" id="eqMeta"></p>
+
+    <h2>점검 체크리스트</h2>
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead><tr><th>항목</th><th>주기</th><th>마지막 점검</th><th>다음 점검</th><th>상태</th><th></th></tr></thead>
+        <tbody id="checklistBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+
+    <form id="addItemForm" class="inline-form-row">
+        <input type="text" name="item_name" placeholder="점검 항목명" required>
+        <input type="number" name="period_days" placeholder="주기(일)" value="7" min="1" style="width:90px;">
+        <input type="text" name="next_due_note" placeholder="다음점검 메모 (선택)">
+        <button type="submit" class="btn btn-primary btn-sm">항목 추가</button>
+    </form>
+
+    <h2>고장/이슈</h2>
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead><tr><th>제목</th><th>심각도</th><th>상태</th><th>발생일</th><th></th></tr></thead>
+        <tbody id="issuesBody"><tr><td colspan="5">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+
+    <form id="addIssueForm" class="form-box form-box-wide">
+        <label>새 이슈/고장 신고</label>
+        <div class="form-row-2">
+            <div><label>제목</label><input type="text" name="title" required></div>
+            <div><label>발생일</label><input type="date" name="occurred_at"></div>
+        </div>
+        <label>상세 내용</label><textarea name="description" rows="2"></textarea>
+        <div class="form-row-2">
+            <div><label>심각도</label>
+                <select name="severity"><option value="LOW">낮음</option><option value="MEDIUM" selected>중간</option><option value="HIGH">높음</option></select>
+            </div>
+            <div><label>비고</label><input type="text" name="notes" placeholder="처리 방법/계획"></div>
+        </div>
+        <button type="submit" class="btn btn-danger">이슈 등록</button>
+    </form>
+</main>
+
+<script src="js/lib.js"></script>
+<script src="js/nav.js"></script>
+<script>
+const eqId = new URLSearchParams(location.search).get("id");
+
+(async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    renderNavbar();
+    document.querySelector('input[name="occurred_at"]').value = todayStr();
+    await loadAll();
+})();
+
+async function loadAll() {
+    const { data: eq, error } = await sb.from("equipment").select("*").eq("id", eqId).single();
+    if (error || !eq) { document.getElementById("eqName").textContent = "설비를 찾을 수 없습니다."; return; }
+    document.getElementById("eqName").textContent = eq.name;
+    document.getElementById("eqMeta").textContent =
+        `위치: ${eq.location || "-"} · 분류: ${eq.category || "-"} · 모델: ${eq.model_no || "-"} · 설치일: ${eq.install_date || "-"}`;
+
+    await loadChecklist();
+    await loadIssues();
+}
+
+async function loadChecklist() {
+    const { data: items, error } = await sb
+        .from("checklist_items")
+        .select("*, inspection_records(id, checked_at, status)")
+        .eq("equipment_id", eqId).eq("is_active", true);
+    if (error) { alert(error.message); return; }
+
+    const tbody = document.getElementById("checklistBody");
+    if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="6">점검 항목이 없습니다.</td></tr>`; return; }
+
+    tbody.innerHTML = items.map(item => {
+        const records = (item.inspection_records || []).sort((a, b) => b.checked_at.localeCompare(a.checked_at));
+        const last = records[0] || null;
+        const status = computeDueStatus(item, last);
+        const nextDueDisplay = item.next_due_note ? escapeHtml(item.next_due_note) : (status.nextDue || "-");
+        return `
+        <tr>
+            <td>${escapeHtml(item.item_name)}</td>
+            <td>${item.period_days}일</td>
+            <td>${status.lastChecked || "-"}</td>
+            <td>${nextDueDisplay}</td>
+            <td>${badgeHtml(status.dueState, status.daysOverdue, item.next_due_note)}</td>
+            <td class="action-buttons">
+                <a href="checklist-check.html?item_id=${item.id}" class="btn btn-sm btn-ok">점검하기</a>
+                <button class="btn btn-sm" onclick="editItem(${item.id}, '${escapeHtml(item.item_name)}', ${item.period_days}, '${escapeHtml(item.next_due_note || "")}')">수정</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteItem(${item.id})">삭제</button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+async function editItem(id, currentName, currentPeriod, currentNote) {
+    const name = prompt("항목명", currentName);
+    if (name === null) return;
+    const period = prompt("주기(일)", currentPeriod);
+    if (period === null) return;
+    const note = prompt("다음점검 메모 (없으면 빈칸)", currentNote);
+    const { error } = await sb.from("checklist_items").update({
+        item_name: name.trim(), period_days: parseInt(period) || 7, next_due_note: note ? note.trim() : null,
+    }).eq("id", id);
+    if (error) { alert(error.message); return; }
+    await loadChecklist();
+}
+
+async function deleteItem(id) {
+    if (!confirm("삭제하시겠습니까?")) return;
+    const { error } = await sb.from("checklist_items").update({ is_active: false }).eq("id", id);
+    if (error) { alert(error.message); return; }
+    await loadChecklist();
+}
+
+document.getElementById("addItemForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const { error } = await sb.from("checklist_items").insert({
+        equipment_id: eqId, item_name: f.item_name.value.trim(),
+        period_days: parseInt(f.period_days.value) || 7,
+        next_due_note: f.next_due_note.value.trim() || null,
+    });
+    if (error) { alert(error.message); return; }
+    f.reset(); f.period_days.value = 7;
+    await loadChecklist();
+});
+
+async function loadIssues() {
+    const { data: issues, error } = await sb.from("issues").select("*").eq("equipment_id", eqId).order("reported_at", { ascending: false });
+    if (error) { alert(error.message); return; }
+    const tbody = document.getElementById("issuesBody");
+    if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="5">등록된 이슈가 없습니다.</td></tr>`; return; }
+    tbody.innerHTML = issues.map(i => `
+        <tr>
+            <td>${escapeHtml(i.title)}${i.description ? `<div class="sub-text">${escapeHtml(i.description)}</div>` : ""}${i.notes ? `<div class="sub-text">비고: ${escapeHtml(i.notes)}</div>` : ""}</td>
+            <td>${escapeHtml(i.severity)}</td>
+            <td>${badgeForIssue(i.status)}</td>
+            <td>${i.occurred_at || "-"}</td>
+            <td>${i.status !== "DONE" ? `
+                <select onchange="updateIssueStatus(${i.id}, this.value)">
+                    <option value="OPEN" ${i.status === "OPEN" ? "selected" : ""}>접수</option>
+                    <option value="IN_PROGRESS" ${i.status === "IN_PROGRESS" ? "selected" : ""}>조치중</option>
+                    <option value="DONE">완료</option>
+                </select>` : (i.resolution_memo || "")}</td>
+        </tr>
+    `).join("");
+}
+
+function badgeForIssue(status) {
+    if (status === "OPEN") return `<span class="badge badge-danger">접수</span>`;
+    if (status === "IN_PROGRESS") return `<span class="badge badge-warning">조치중</span>`;
+    return `<span class="badge badge-ok">완료</span>`;
+}
+
+async function updateIssueStatus(id, newStatus) {
+    const memo = newStatus === "DONE" ? (prompt("조치 메모 (선택)") || "") : "";
+    const payload = { status: newStatus, resolution_memo: memo };
+    if (newStatus === "DONE") payload.resolved_at = new Date().toISOString();
+    const { error } = await sb.from("issues").update(payload).eq("id", id);
+    if (error) { alert(error.message); return; }
+    await loadIssues();
+}
+
+document.getElementById("addIssueForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const session = await requireAuth();
+    const { error } = await sb.from("issues").insert({
+        equipment_id: eqId, title: f.title.value.trim(), description: f.description.value.trim(),
+        severity: f.severity.value, occurred_at: f.occurred_at.value || todayStr(),
+        notes: f.notes.value.trim(), reported_by: session.user.email,
+    });
+    if (error) { alert(error.message); return; }
+    f.reset(); f.occurred_at.value = todayStr();
+    await loadIssues();
+});
+</script>
+</body>
+</html>

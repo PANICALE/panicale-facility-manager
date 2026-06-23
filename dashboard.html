@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대시보드 - 시설관리</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main class="container">
+    <h1>대시보드</h1>
+    <div class="stat-cards">
+        <div class="stat-card"><div class="stat-num" id="statEquipment">-</div><div class="stat-label">관리 설비</div></div>
+        <div class="stat-card" id="statOverdueCard"><div class="stat-num" id="statOverdue">-</div><div class="stat-label">점검 기한 초과</div></div>
+        <div class="stat-card"><div class="stat-num" id="statIssues">-</div><div class="stat-label">진행중 이슈</div></div>
+    </div>
+
+    <h2>점검 현황</h2>
+    <div class="table-wrap">
+    <table class="data-table card-table">
+        <thead><tr><th>설비</th><th>점검항목</th><th>마지막 점검</th><th>다음 점검 예정</th><th>상태</th><th></th></tr></thead>
+        <tbody id="checklistBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+
+    <h2>점검 현황 2 <span style="font-size:13px; color:#9ca3af; font-weight:normal;">(다음점검을 메모로 관리하는 항목)</span></h2>
+    <div class="table-wrap">
+    <table class="data-table card-table">
+        <thead><tr><th>설비</th><th>점검항목</th><th>마지막 점검</th><th>다음 점검 메모</th><th></th></tr></thead>
+        <tbody id="checklistBodyNote"><tr><td colspan="5">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+
+    <h2>진행중 이슈</h2>
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead><tr><th>설비</th><th>제목</th><th>심각도</th><th>상태</th><th>발생일</th></tr></thead>
+        <tbody id="issuesBody"><tr><td colspan="5">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+</main>
+
+<script src="js/lib.js"></script>
+<script src="js/nav.js"></script>
+<script>
+(async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    renderNavbar("dashboard");
+    await loadDashboard();
+})();
+
+async function loadDashboard() {
+    // 설비 + 점검항목 + 최근 점검기록을 한번에 불러옴
+    const { data: equipmentList, error: eqErr } = await sb
+        .from("equipment")
+        .select("id, name, is_active, checklist_items(id, item_name, period_days, next_due_note, is_active, inspection_records(checked_at, status, id))")
+        .eq("is_active", true)
+        .order("name");
+
+    if (eqErr) { alert("불러오기 실패: " + eqErr.message); return; }
+
+   const rows = [];
+    const noteRows = [];
+    let overdueCount = 0;
+
+    for (const eq of equipmentList) {
+        for (const item of (eq.checklist_items || [])) {
+            if (!item.is_active) continue;
+            const records = (item.inspection_records || []).sort((a, b) => b.checked_at.localeCompare(a.checked_at));
+            const last = records[0] || null;
+            const status = computeDueStatus(item, last);
+            if (status.dueState === "OVERDUE") overdueCount++;
+
+            if (item.next_due_note) {
+                noteRows.push({ equipment: eq, item, status });
+            } else {
+                rows.push({ equipment: eq, item, status });
+            }
+        }
+    }
+
+    // 다음 점검 예정일 오름차순 정렬 (가까운 날짜부터, 날짜 없는 미점검 항목은 맨 뒤로)
+    rows.sort((a, b) => {
+        if (!a.status.nextDue) return 1;
+        if (!b.status.nextDue) return -1;
+        return a.status.nextDue.localeCompare(b.status.nextDue);
+    });
+
+    document.getElementById("statEquipment").textContent = equipmentList.length;
+    document.getElementById("statOverdue").textContent = overdueCount;
+    if (overdueCount > 0) document.getElementById("statOverdueCard").classList.add("stat-danger");
+
+const tbody = document.getElementById("checklistBody");
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6">등록된 점검 항목이 없습니다.</td></tr>`;
+    } else {
+        tbody.innerHTML = rows.map(r => `
+            <tr>
+                <td data-label="설비"><a href="equipment-detail.html?id=${r.equipment.id}">${escapeHtml(r.equipment.name)}</a></td>
+                <td data-label="점검항목">${escapeHtml(r.item.item_name)}</td>
+                <td data-label="마지막 점검">${r.status.lastChecked || "-"}</td>
+                <td data-label="다음 점검 예정">${r.status.nextDue || "-"}</td>
+                <td data-label="상태">${badgeHtml(r.status.dueState, r.status.daysOverdue, r.item.next_due_note)}</td>
+                <td>${`<a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a>`}</td>
+            </tr>
+        `).join("");
+    }
+
+    const tbodyNote = document.getElementById("checklistBodyNote");
+    if (noteRows.length === 0) {
+        tbodyNote.innerHTML = `<tr><td colspan="5">해당 항목이 없습니다.</td></tr>`;
+    } else {
+        tbodyNote.innerHTML = noteRows.map(r => `
+            <tr>
+                <td data-label="설비"><a href="equipment-detail.html?id=${r.equipment.id}">${escapeHtml(r.equipment.name)}</a></td>
+                <td data-label="점검항목">${escapeHtml(r.item.item_name)}</td>
+                <td data-label="마지막 점검">${r.status.lastChecked || "-"}</td>
+                <td data-label="다음 점검 메모">${escapeHtml(r.item.next_due_note)}</td>
+                <td><a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a></td>
+            </tr>
+        `).join("");
+    }
+
+    // 진행중 이슈
+    const { data: issues, error: issErr } = await sb
+        .from("issues")
+        .select("id, title, severity, status, reported_at, equipment(name)")
+        .neq("status", "DONE")
+        .order("reported_at", { ascending: false });
+
+    if (issErr) { console.error(issErr); return; }
+    document.getElementById("statIssues").textContent = issues.length;
+
+    const issuesBody = document.getElementById("issuesBody");
+    if (issues.length === 0) {
+        issuesBody.innerHTML = `<tr><td colspan="5">진행중인 이슈가 없습니다.</td></tr>`;
+    } else {
+        issuesBody.innerHTML = issues.map(i => `
+            <tr>
+                <td>${escapeHtml(i.equipment ? i.equipment.name : "-")}</td>
+                <td>${escapeHtml(i.title)}</td>
+                <td>${escapeHtml(i.severity)}</td>
+                <td>${escapeHtml(i.status)}</td>
+                <td>${i.reported_at ? i.reported_at.slice(0, 10) : "-"}</td>
+            </tr>
+        `).join("");
+    }
+}
+</script>
+</body>
+</html>

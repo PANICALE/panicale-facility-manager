@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 - 시설관리</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main class="container">
+    <div class="login-box">
+        <h1>🏭 PANICALE 시설관리 시스템</h1>
+        <div id="flash"></div>
+        <form id="loginForm">
+            <label>이메일</label>
+            <input type="email" id="email" required autofocus>
+            <label>비밀번호</label>
+            <input type="password" id="password" required>
+            <button type="submit" class="btn btn-primary">로그인</button>
+        </form>
+    </div>
+</main>
+
+<script src="js/lib.js"></script>
+<script>
+(async () => {
+    // 이미 로그인되어 있으면 바로 대시보드로
+    const { data } = await sb.auth.getSession();
+    if (data.session) window.location.href = "dashboard.html";
+})();
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+        document.getElementById("flash").innerHTML =
+            `<div class="flash flash-error">로그인 실패: ${escapeHtml(error.message)}</div>`;
+        return;
+    }
+    window.location.href = "dashboard.html";
+});
+</script>
+</body>
+</html>

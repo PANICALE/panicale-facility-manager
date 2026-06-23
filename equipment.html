@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설비 - 시설관리</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main class="container">
+    <div class="page-header">
+        <h1>설비 목록</h1>
+        <button class="btn btn-primary" id="addBtn">+ 설비 등록</button>
+    </div>
+
+    <form id="addForm" class="form-box" style="display:none;">
+        <label>설비명 *</label><input type="text" name="name" required>
+        <label>위치</label><input type="text" name="location">
+        <label>분류</label><input type="text" name="category">
+        <label>모델명</label><input type="text" name="model_no">
+        <label>설치일</label><input type="date" name="install_date">
+        <label>비고</label><textarea name="notes" rows="2"></textarea>
+        <button type="submit" class="btn btn-primary">저장</button>
+    </form>
+
+    <div class="table-wrap">
+    <table class="data-table">
+        <thead><tr><th>이름</th><th>위치</th><th>분류</th><th>모델명</th><th></th></tr></thead>
+        <tbody id="listBody"><tr><td colspan="5">불러오는 중...</td></tr></tbody>
+    </table>
+    </div>
+</main>
+
+<script src="js/lib.js"></script>
+<script src="js/nav.js"></script>
+<script>
+(async () => {
+    const session = await requireAuth();
+    if (!session) return;
+    renderNavbar();
+    await loadList();
+})();
+
+document.getElementById("addBtn").addEventListener("click", () => {
+    document.getElementById("addForm").style.display = "block";
+});
+
+document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const { error } = await sb.from("equipment").insert({
+        name: f.name.value.trim(), location: f.location.value.trim(),
+        category: f.category.value.trim(), model_no: f.model_no.value.trim(),
+        install_date: f.install_date.value || null, notes: f.notes.value.trim(),
+    });
+    if (error) { alert("등록 실패: " + error.message); return; }
+    f.reset();
+    f.style.display = "none";
+    await loadList();
+});
+
+async function loadList() {
+    const { data, error } = await sb.from("equipment").select("*").eq("is_active", true).order("name");
+    if (error) { alert("불러오기 실패: " + error.message); return; }
+    const tbody = document.getElementById("listBody");
+    if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="5">등록된 설비가 없습니다.</td></tr>`; return; }
+    tbody.innerHTML = data.map(eq => `
+        <tr>
+            <td><a href="equipment-detail.html?id=${eq.id}">${escapeHtml(eq.name)}</a></td>
+            <td>${escapeHtml(eq.location) || "-"}</td>
+            <td>${escapeHtml(eq.category) || "-"}</td>
+            <td>${escapeHtml(eq.model_no) || "-"}</td>
+            <td><a href="equipment-detail.html?id=${eq.id}" class="btn btn-sm">상세</a></td>
+        </tr>
+    `).join("");
+}
+</script>
+</body>
+</html>
