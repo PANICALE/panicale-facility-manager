@@ -5,7 +5,7 @@
 * { box-sizing: border-box; }
 body { font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--text); margin: 0; }
 
-.navbar { background: #111827; color: white; display: flex; align-items: center; padding: 14px 24px; flex-wrap: wrap; gap: 24px; }
+.navbar { background: #111827; color: white; display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; padding-top: calc(14px + env(safe-area-inset-top)); flex-wrap: wrap; gap: 8px; }
 .nav-brand a { color: white; font-weight: 700; text-decoration: none; font-size: 18px; }
 .nav-links a { color: #d1d5db; text-decoration: none; margin-right: 18px; font-size: 14px; }
 .nav-links a:hover { color: white; }
