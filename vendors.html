@@ -29,7 +29,7 @@
     </form>
 
     <div class="table-wrap">
-    <table class="data-table">
+    <table class="data-table card-table">
         <thead><tr><th>업체명</th><th>분야</th><th>담당자</th><th>연락처</th><th>비고</th><th></th></tr></thead>
         <tbody id="listBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
     </table>
@@ -70,11 +70,11 @@ async function loadList() {
     if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="6">등록된 업체가 없습니다.</td></tr>`; return; }
     tbody.innerHTML = data.map(v => `
         <tr>
-            <td>${escapeHtml(v.name)}</td>
-            <td>${escapeHtml(v.category) || "-"}</td>
-            <td>${escapeHtml(v.contact_person) || "-"}</td>
-            <td>${v.phone ? `<a href="tel:${escapeHtml(v.phone)}">${escapeHtml(v.phone)}</a>` : "-"}</td>
-            <td>${escapeHtml(v.notes) || "-"}</td>
+            <td data-label="업체명">${escapeHtml(v.name)}</td>
+            <td data-label="분야">${escapeHtml(v.category) || "-"}</td>
+            <td data-label="담당자">${escapeHtml(v.contact_person) || "-"}</td>
+            <td data-label="연락처">${v.phone ? `<a href="tel:${escapeHtml(v.phone)}">${escapeHtml(v.phone)}</a>` : "-"}</td>
+            <td data-label="비고">${escapeHtml(v.notes) || "-"}</td>
             <td>
                 <button class="btn btn-sm" onclick="editVendor(${v.id}, '${escapeHtml(v.name)}', '${escapeHtml(v.category || "")}', '${escapeHtml(v.contact_person || "")}', '${escapeHtml(v.phone || "")}', '${escapeHtml(v.notes || "")}')">수정</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteVendor(${v.id})">삭제</button>
