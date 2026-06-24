@@ -19,11 +19,11 @@
 
     <h2>점검 체크리스트</h2>
     <div class="table-wrap">
-    <table class="data-table">
-        <thead><tr><th>항목</th><th>주기</th><th>마지막 점검</th><th>다음 점검</th><th>상태</th><th></th></tr></thead>
-        <tbody id="checklistBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
-    </table>
-    </div>
+<table class="data-table card-table">
+    <thead><tr><th>항목</th><th>주기</th><th>마지막 점검</th><th>다음 점검</th><th>상태</th><th></th></tr></thead>
+    <tbody id="checklistBody"></tbody>
+</table>
+</div>
 
     <form id="addItemForm" class="inline-form-row">
         <input type="text" name="item_name" placeholder="점검 항목명" required>
@@ -34,11 +34,11 @@
 
  <h2>고장/이슈 이력</h2>
     <div class="table-wrap">
-    <table class="data-table card-table">
-        <thead><tr><th>제목</th><th>발생일</th><th>상태</th><th>처리시작일</th><th>완료일</th><th></th></tr></thead>
-        <tbody id="issuesBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
-    </table>
-    </div>
+<table class="data-table card-table">
+    <thead><tr><th>제목</th><th>발생일</th><th>상태</th><th>처리시작일</th><th>완료일</th><th></th></tr></thead>
+    <tbody id="issuesBody"></tbody>
+</table>
+</div>
 
     <form id="addIssueForm" class="form-box form-box-wide">
         <label>새 이슈/고장 신고</label>
@@ -92,18 +92,18 @@ async function loadChecklist() {
         const status = computeDueStatus(item, last);
         const nextDueDisplay = item.next_due_note ? escapeHtml(item.next_due_note) : (status.nextDue || "-");
         return `
-        <tr>
-            <td>${escapeHtml(item.item_name)}</td>
-            <td>${item.period_days}일</td>
-            <td>${status.lastChecked || "-"}</td>
-            <td>${nextDueDisplay}</td>
-            <td>${badgeHtml(status.dueState, status.daysOverdue, item.next_due_note)}</td>
-            <td class="action-buttons">
-                <a href="checklist-check.html?item_id=${item.id}" class="btn btn-sm btn-ok">점검하기</a>
-                <button class="btn btn-sm" onclick="editItem(${item.id}, '${escapeHtml(item.item_name)}', ${item.period_days}, '${escapeHtml(item.next_due_note || "")}')">수정</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteItem(${item.id})">삭제</button>
-            </td>
-        </tr>`;
+<tr>
+    <td data-label="항목">${escapeHtml(item.item_name)}</td>
+    <td data-label="주기">${item.period_days}일</td>
+    <td data-label="마지막 점검">${status.lastChecked || "-"}</td>
+    <td data-label="다음 점검">${nextDueDisplay}</td>
+    <td data-label="상태">${badgeHtml(status.dueState, status.daysOverdue, item.next_due_note)}</td>
+    <td class="action-buttons">
+        <a href="checklist-check.html?item_id=${item.id}" class="btn btn-sm btn-ok">점검하기</a>
+        <button class="btn btn-sm" onclick="editItem(${item.id}, '${escapeHtml(item.item_name)}', ${item.period_days}, '${escapeHtml(item.next_due_note || "")}')">수정</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem(${item.id})">삭제</button>
+    </td>
+</tr>`;
     }).join("");
 }
 
@@ -146,15 +146,15 @@ async function loadIssues() {
     const tbody = document.getElementById("issuesBody");
     if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="6">등록된 이슈가 없습니다.</td></tr>`; return; }
     tbody.innerHTML = issues.map(i => `
-        <tr>
-            <td data-label="제목">${escapeHtml(i.title)}${i.description ? `<div class="sub-text">${escapeHtml(i.description)}</div>` : ""}${i.notes ? `<div class="sub-text">비고: ${escapeHtml(i.notes)}</div>` : ""}</td>
-            <td data-label="발생일">${i.occurred_at || "-"}</td>
-            <td data-label="상태">${badgeForIssue(i.status)}</td>
-            <td data-label="처리시작일">${i.in_progress_at ? i.in_progress_at.slice(0, 10) : "-"}</td>
-            <td data-label="완료일">${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
-            <td><button class="btn btn-sm" onclick='editIssue(${i.id})'>수정</button></td>
-        </tr>
-    `).join("");
+    <tr>
+        <td data-label="제목">${escapeHtml(i.title)}${i.description ? `<div class="sub-text">${escapeHtml(i.description)}</div>` : ""}${i.notes ? `<div class="sub-text">비고: ${escapeHtml(i.notes)}</div>` : ""}</td>
+        <td data-label="발생일">${i.occurred_at || "-"}</td>
+        <td data-label="상태">${badgeForIssue(i.status)}</td>
+        <td data-label="처리시작일">${i.in_progress_at ? i.in_progress_at.slice(0, 10) : "-"}</td>
+        <td data-label="완료일">${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
+        <td><button class="btn btn-sm" onclick='editIssue(${i.id})'>수정</button></td>
+    </tr>
+`).join("");
 
     window._issuesCache = issues;
 }
