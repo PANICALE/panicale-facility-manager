@@ -32,11 +32,11 @@
         <button type="submit" class="btn btn-primary btn-sm">항목 추가</button>
     </form>
 
-    <h2>고장/이슈</h2>
+ <h2>고장/이슈 이력</h2>
     <div class="table-wrap">
-    <table class="data-table">
-        <thead><tr><th>제목</th><th>심각도</th><th>상태</th><th>발생일</th><th></th></tr></thead>
-        <tbody id="issuesBody"><tr><td colspan="5">불러오는 중...</td></tr></tbody>
+    <table class="data-table card-table">
+        <thead><tr><th>제목</th><th>발생일</th><th>상태</th><th>처리시작일</th><th>완료일</th><th></th></tr></thead>
+        <tbody id="issuesBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
     </table>
     </div>
 
@@ -47,12 +47,7 @@
             <div><label>발생일</label><input type="date" name="occurred_at"></div>
         </div>
         <label>상세 내용</label><textarea name="description" rows="2"></textarea>
-        <div class="form-row-2">
-            <div><label>심각도</label>
-                <select name="severity"><option value="LOW">낮음</option><option value="MEDIUM" selected>중간</option><option value="HIGH">높음</option></select>
-            </div>
-            <div><label>비고</label><input type="text" name="notes" placeholder="처리 방법/계획"></div>
-        </div>
+        <label>비고</label><input type="text" name="notes" placeholder="처리 방법/계획">
         <button type="submit" class="btn btn-danger">이슈 등록</button>
     </form>
 </main>
@@ -146,37 +141,53 @@ document.getElementById("addItemForm").addEventListener("submit", async (e) => {
 });
 
 async function loadIssues() {
-    const { data: issues, error } = await sb.from("issues").select("*").eq("equipment_id", eqId).order("reported_at", { ascending: false });
+   const { data: issues, error } = await sb.from("issues").select("*").eq("equipment_id", eqId).order("occurred_at", { ascending: false });
     if (error) { alert(error.message); return; }
     const tbody = document.getElementById("issuesBody");
-    if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="5">등록된 이슈가 없습니다.</td></tr>`; return; }
+    if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="6">등록된 이슈가 없습니다.</td></tr>`; return; }
     tbody.innerHTML = issues.map(i => `
         <tr>
-            <td>${escapeHtml(i.title)}${i.description ? `<div class="sub-text">${escapeHtml(i.description)}</div>` : ""}${i.notes ? `<div class="sub-text">비고: ${escapeHtml(i.notes)}</div>` : ""}</td>
-            <td>${escapeHtml(i.severity)}</td>
-            <td>${badgeForIssue(i.status)}</td>
-            <td>${i.occurred_at || "-"}</td>
-            <td>${i.status !== "DONE" ? `
-                <select onchange="updateIssueStatus(${i.id}, this.value)">
-                    <option value="OPEN" ${i.status === "OPEN" ? "selected" : ""}>접수</option>
-                    <option value="IN_PROGRESS" ${i.status === "IN_PROGRESS" ? "selected" : ""}>조치중</option>
-                    <option value="DONE">완료</option>
-                </select>` : (i.resolution_memo || "")}</td>
+            <td data-label="제목">${escapeHtml(i.title)}${i.description ? `<div class="sub-text">${escapeHtml(i.description)}</div>` : ""}${i.notes ? `<div class="sub-text">비고: ${escapeHtml(i.notes)}</div>` : ""}</td>
+            <td data-label="발생일">${i.occurred_at || "-"}</td>
+            <td data-label="상태">${badgeForIssue(i.status)}</td>
+            <td data-label="처리시작일">${i.in_progress_at ? i.in_progress_at.slice(0, 10) : "-"}</td>
+            <td data-label="완료일">${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
+            <td><button class="btn btn-sm" onclick='editIssue(${i.id})'>수정</button></td>
         </tr>
     `).join("");
+
+    window._issuesCache = issues;
 }
 
 function badgeForIssue(status) {
-    if (status === "OPEN") return `<span class="badge badge-danger">접수</span>`;
-    if (status === "IN_PROGRESS") return `<span class="badge badge-warning">조치중</span>`;
+    if (status === "OPEN") return `<span class="badge badge-danger">대기</span>`;
+    if (status === "IN_PROGRESS") return `<span class="badge badge-warning">처리중</span>`;
     return `<span class="badge badge-ok">완료</span>`;
 }
 
-async function updateIssueStatus(id, newStatus) {
-    const memo = newStatus === "DONE" ? (prompt("조치 메모 (선택)") || "") : "";
-    const payload = { status: newStatus, resolution_memo: memo };
-    if (newStatus === "DONE") payload.resolved_at = new Date().toISOString();
-    const { error } = await sb.from("issues").update(payload).eq("id", id);
+async function editIssue(id) {
+    const issue = (window._issuesCache || []).find(i => i.id === id);
+    if (!issue) return;
+
+    const title = prompt("제목", issue.title);
+    if (title === null) return;
+    const occurredAt = prompt("발생일 (YYYY-MM-DD)", issue.occurred_at || "");
+    if (occurredAt === null) return;
+    const inProgressAt = prompt("처리시작일 (YYYY-MM-DD, 없으면 빈칸)", issue.in_progress_at ? issue.in_progress_at.slice(0, 10) : "");
+    if (inProgressAt === null) return;
+    const resolvedAt = prompt("완료일 (YYYY-MM-DD, 없으면 빈칸)", issue.resolved_at ? issue.resolved_at.slice(0, 10) : "");
+    if (resolvedAt === null) return;
+    const notes = prompt("비고", issue.notes || "");
+    if (notes === null) return;
+
+    const { error } = await sb.from("issues").update({
+        title: title.trim(),
+        occurred_at: occurredAt.trim() || null,
+        in_progress_at: inProgressAt.trim() ? inProgressAt.trim() + "T00:00:00" : null,
+        resolved_at: resolvedAt.trim() ? resolvedAt.trim() + "T00:00:00" : null,
+        notes: notes.trim(),
+    }).eq("id", id);
+
     if (error) { alert(error.message); return; }
     await loadIssues();
 }
@@ -187,7 +198,7 @@ document.getElementById("addIssueForm").addEventListener("submit", async (e) => 
     const session = await requireAuth();
     const { error } = await sb.from("issues").insert({
         equipment_id: eqId, title: f.title.value.trim(), description: f.description.value.trim(),
-        severity: f.severity.value, occurred_at: f.occurred_at.value || todayStr(),
+        occurred_at: f.occurred_at.value || todayStr(),
         notes: f.notes.value.trim(), reported_by: session.user.email,
     });
     if (error) { alert(error.message); return; }

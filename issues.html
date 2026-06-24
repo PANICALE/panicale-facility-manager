@@ -17,7 +17,8 @@
     <h1>이슈/고장 목록</h1>
     <div class="table-wrap">
     <table class="data-table">
-        <thead><tr><th>설비</th><th>제목</th><th>심각도</th><th>상태</th><th>발생일</th><th>완료일</th></tr></thead>
+        <table class="data-table card-table">
+        <thead><tr><th>설비</th><th>제목</th><th>발생일</th><th>상태</th><th>처리시작일</th><th>완료일</th></tr></thead>
         <tbody id="issuesBody"><tr><td colspan="6">불러오는 중...</td></tr></tbody>
     </table>
     </div>
@@ -26,25 +27,31 @@
 <script src="js/lib.js"></script>
 <script src="js/nav.js"></script>
 <script>
+function issueStatusLabel(status) {
+    if (status === "OPEN") return `<span class="badge badge-danger">대기</span>`;
+    if (status === "IN_PROGRESS") return `<span class="badge badge-warning">처리중</span>`;
+    return `<span class="badge badge-ok">완료</span>`;
+}
+
 (async () => {
     const session = await requireAuth();
     if (!session) return;
     renderNavbar();
 
     const { data: issues, error } = await sb
-        .from("issues").select("*, equipment(id, name)").order("reported_at", { ascending: false });
+        .from("issues").select("*, equipment(id, name)").order("occurred_at", { ascending: false });
     if (error) { alert(error.message); return; }
 
     const tbody = document.getElementById("issuesBody");
     if (issues.length === 0) { tbody.innerHTML = `<tr><td colspan="6">이슈가 없습니다.</td></tr>`; return; }
     tbody.innerHTML = issues.map(i => `
         <tr>
-            <td><a href="equipment-detail.html?id=${i.equipment.id}">${escapeHtml(i.equipment.name)}</a></td>
-            <td>${escapeHtml(i.title)}</td>
-            <td>${escapeHtml(i.severity)}</td>
-            <td>${escapeHtml(i.status)}</td>
-            <td>${i.occurred_at || "-"}</td>
-            <td>${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
+            <td data-label="설비"><a href="equipment-detail.html?id=${i.equipment.id}">${escapeHtml(i.equipment.name)}</a></td>
+            <td data-label="제목">${escapeHtml(i.title)}</td>
+            <td data-label="발생일">${i.occurred_at || "-"}</td>
+            <td data-label="상태">${issueStatusLabel(i.status)}</td>
+            <td data-label="처리시작일">${i.in_progress_at ? i.in_progress_at.slice(0, 10) : "-"}</td>
+            <td data-label="완료일">${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
         </tr>
     `).join("");
 })();
