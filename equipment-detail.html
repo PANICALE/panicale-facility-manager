@@ -70,7 +70,7 @@ async function loadAll() {
     if (error || !eq) { document.getElementById("eqName").textContent = "설비를 찾을 수 없습니다."; return; }
     document.getElementById("eqName").textContent = eq.name;
     document.getElementById("eqMeta").textContent =
-        `위치: ${eq.location || "-"} · 분류: ${eq.category || "-"} · 모델: ${eq.model_no || "-"} · 설치일: ${eq.install_date || "-"}`;
+        `위치: ${eq.location || "-"} · 설비구분: ${eq.category || "-"} · 모델: ${eq.model_no || "-"} · 설치일: ${eq.install_date || "-"}`;
 
     await loadChecklist();
     await loadIssues();
@@ -98,7 +98,7 @@ async function loadChecklist() {
     <td data-label="마지막 점검">${status.lastChecked || "-"}</td>
     <td data-label="다음 점검">${nextDueDisplay}</td>
     <td data-label="상태">${badgeHtml(status.dueState, status.daysOverdue, item.next_due_note)}</td>
-    <td class="action-buttons">
+    <td class="action-buttons card-action-cell">
         <a href="checklist-check.html?item_id=${item.id}" class="btn btn-sm btn-ok">점검하기</a>
         <button class="btn btn-sm" onclick="editItem(${item.id}, '${escapeHtml(item.item_name)}', ${item.period_days}, '${escapeHtml(item.next_due_note || "")}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="deleteItem(${item.id})">삭제</button>
@@ -152,7 +152,7 @@ async function loadIssues() {
         <td data-label="상태">${badgeForIssue(i.status)}</td>
         <td data-label="처리시작일">${i.in_progress_at ? i.in_progress_at.slice(0, 10) : "-"}</td>
         <td data-label="완료일">${i.resolved_at ? i.resolved_at.slice(0, 10) : "-"}</td>
-        <td><button class="btn btn-sm" onclick='editIssue(${i.id})'>수정</button></td>
+        <td class="card-action-cell"><button class="btn btn-sm" onclick='editIssue(${i.id})'>수정</button></td>
     </tr>
 `).join("");
 

@@ -114,7 +114,7 @@ const tbody = document.getElementById("checklistBody");
                 <td data-label="마지막 점검">${r.status.lastChecked || "-"}</td>
                 <td data-label="다음 점검 예정">${r.status.nextDue || "-"}</td>
                 <td data-label="상태">${badgeHtml(r.status.dueState, r.status.daysOverdue, r.item.next_due_note)}</td>
-                <td>${`<a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a>`}</td>
+                <td class="card-action-cell"><a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a></td>
             </tr>
         `).join("");
     }
@@ -129,7 +129,7 @@ const tbody = document.getElementById("checklistBody");
                 <td data-label="점검항목">${escapeHtml(r.item.item_name)}</td>
                 <td data-label="마지막 점검">${r.status.lastChecked || "-"}</td>
                 <td data-label="다음 점검 메모">${escapeHtml(r.item.next_due_note)}</td>
-                <td><a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a></td>
+                <td class="card-action-cell"><a href="checklist-check.html?item_id=${r.item.id}" class="btn btn-sm btn-ok">점검하기</a></td>
             </tr>
         `).join("");
     }

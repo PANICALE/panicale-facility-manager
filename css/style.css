@@ -99,10 +99,10 @@ h2 { font-size: 17px; margin-top: 32px; margin-bottom: 10px; color: #374151; }
     .data-table.card-table td:first-of-type {
         background: #f9fafb; font-weight: 700; font-size: 15px;
     }
-    .data-table.card-table td:last-child {
-        border-bottom: none; text-align: center; padding: 10px 12px;
+    .data-table.card-table td.card-action-cell {
+    border-bottom: none; text-align: center; padding: 10px 12px; background: #f9fafb;
     }
-    .data-table.card-table td:last-child::before { display: none; }
+    .data-table.card-table td.card-action-cell::before { display: none; }
 
     .table-wrap { overflow-x: visible; }
     .table-wrap .data-table { min-width: 0; }
